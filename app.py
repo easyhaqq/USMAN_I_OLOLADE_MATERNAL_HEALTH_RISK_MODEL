@@ -3,11 +3,9 @@ import joblib
 import pandas as pd
 import xgboost as xgb
 import os
-from dotenv import load_dotenv
 from google import genai
 
-# --- 1. System Initialization & Configuration ---
-load_dotenv()
+
 
 st.set_page_config(
     page_title="Maternal Triage System | MedAI", 
@@ -16,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-API_KEY = os.environ.get("GEMINI_API_KEY") 
+API_KEY = st.secrets["GEMINI_API_KEY"] 
 client = genai.Client(api_key=API_KEY)
 
 # --- 2. Dynamic Prompt Engine ---
