@@ -99,9 +99,9 @@ Vitals: BP {systolic}/{diastolic} mmHg, Blood glucose {bs_mgdl} mg/dL, Temp {tem
 Triage risk level (already determined upstream — report it, do not recalculate, soften, or contradict it): {risk_level.upper()}
 
 Write a well explained, empathetic, and actionable consultation note for {display_name}. Include the following sections:
-[2-3 sentences addressing {display_name} by name. Reference her specific numbers in plain language. Explain what her risk level means for her, practically. {guidance['urgency']} Do not name a specific diagnosis (e.g. preeclampsia, gestational diabetes) — a single reading can't establish one.]
+[addressing {display_name} by name. Reference her specific numbers in plain language. Explain what her risk level means for her, practically. {guidance['urgency']} Do not name a specific diagnosis (e.g. preeclampsia, gestational diabetes) — a single reading can't establish one.]
 
-**Recommended Next Steps:**
+**Recommendation:**
 Explain what she should do next, in plain language. Include a clear recommendation for follow-up with her healthcare provider. Emphasize that she should not ignore these readings, and that {guidance['next_step_tone']} care is important.
 
 **Please Note:**
