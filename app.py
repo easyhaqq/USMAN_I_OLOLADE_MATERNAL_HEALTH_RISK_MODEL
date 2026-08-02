@@ -5,7 +5,6 @@ import xgboost as xgb
 import os
 from google import genai
 
-
 st.set_page_config(
     page_title="Maternal Triage System | MedAI", 
     page_icon="🏥", 
@@ -90,13 +89,13 @@ def _get_risk_guidance(risk_level: str) -> dict:
             return RISK_GUIDANCE[tier]
     return RISK_GUIDANCE["mid"]  # unrecognized label: fail toward caution, not complacency
 
-def build_consultation_prompt(display_name, systolic, diastolic, bs, temp, heart_rate, risk_level):
+def build_consultation_prompt(display_name, systolic, diastolic, bs_mgdl, temp, heart_rate, risk_level):
     guidance = _get_risk_guidance(risk_level)
 
     prompt = f"""You are an AI maternal-health assistant. Write in the voice of an experienced, warm OB/GYN talking to a patient: plain language, no jargon, calm and direct. You are an AI, not a licensed physician, and must never imply otherwise.
 
 Patient: {display_name}
-Vitals: BP {systolic}/{diastolic} mmHg, Blood glucose {bs} mmol/L, Temp {temp}°F, Heart rate {heart_rate} BPM
+Vitals: BP {systolic}/{diastolic} mmHg, Blood glucose {bs_mgdl} mg/dL, Temp {temp}°F, Heart rate {heart_rate} BPM
 Triage risk level (already determined upstream — report it, do not recalculate, soften, or contradict it): {risk_level.upper()}
 
 Write the message in exactly this structure:
@@ -155,7 +154,8 @@ with st.form("vitals_form", border=True):
     
     with col1:
         age = st.number_input("Age (Years)", min_value=10, max_value=100, value=25)
-        bs = st.number_input("Random Blood Sugar (mmol/L)", min_value=0.0, max_value=30.0, value=7.0, step=0.1)
+        # Updated to mg/dL with appropriate limits and default value
+        bs_mgdl = st.number_input("Random Blood Sugar (mg/dL)", min_value=0, max_value=500, value=126, step=1)
     with col2:
         systolic = st.number_input("Systolic BP (mmHg)", min_value=50, max_value=200, value=120)
         diastolic = st.number_input("Diastolic BP (mmHg)", min_value=30, max_value=150, value=80)
@@ -169,7 +169,11 @@ with st.form("vitals_form", border=True):
 if submitted:
     display_name = patient_name.strip() if patient_name.strip() else "our patient"
     
-    input_df = pd.DataFrame([[age, systolic, diastolic, bs, temp, heart_rate]], 
+    # CONVERSION: Convert mg/dL back to mmol/L for the ML Model
+    bs_mmol = round(bs_mgdl / 18.0, 1) 
+    
+    # Pass the converted bs_mmol to the ML model
+    input_df = pd.DataFrame([[age, systolic, diastolic, bs_mmol, temp, heart_rate]], 
                             columns=['Age', 'SystolicBP', 'DiastolicBP', 'BS', 'BodyTemp', 'HeartRate'])
     
     input_scaled = scaler.transform(input_df)
@@ -181,7 +185,7 @@ if submitted:
     
     metric_cols = st.columns(5)
     metric_cols[0].metric("Blood Pressure", f"{systolic}/{diastolic}")
-    metric_cols[1].metric("Blood Sugar", f"{bs} mmol/L")
+    metric_cols[1].metric("Blood Sugar", f"{bs_mgdl} mg/dL")  # Display the local mg/dL metric
     metric_cols[2].metric("Body Temp", f"{temp} °F")
     metric_cols[3].metric("Heart Rate", f"{heart_rate} BPM")
     metric_cols[4].metric("Age", f"{age} Yrs")
@@ -200,7 +204,7 @@ if submitted:
             display_name=display_name,
             systolic=systolic,
             diastolic=diastolic,
-            bs=bs,
+            bs_mgdl=bs_mgdl,  # AI gets the mg/dL value
             temp=temp,
             heart_rate=heart_rate,
             risk_level=risk_level
