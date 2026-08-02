@@ -6,13 +6,60 @@ import os
 from google import genai
 
 
-
 st.set_page_config(
     page_title="Maternal Triage System | MedAI", 
     page_icon="🏥", 
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+# --- Custom CSS Injection ---
+st.markdown("""
+<style>
+    /* Soften the main background color */
+    .stApp {
+        background-color: #F8FAFC; 
+    }
+    
+    /* Make headers a professional dark slate */
+    h1, h2, h3 {
+        color: #0F172A;
+    }
+    
+    /* Style the Form and Data Containers as floating white cards */
+    [data-testid="stForm"], div[data-testid="stVerticalBlockBorderWrapper"] > div {
+        background-color: #FFFFFF;
+        border-radius: 12px;
+        border: 1px solid #E2E8F0;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    }
+    
+    /* Style the st.metric items (Patient Vitals) to look like hospital monitors */
+    [data-testid="stMetric"] {
+        background-color: #F1F5F9;
+        border-radius: 8px;
+        padding: 15px;
+        border-left: 5px solid #3B82F6;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Add a smooth hover effect to the Primary Button */
+    [data-testid="baseButton-primary"] {
+        background-color: #3B82F6;
+        color: #FFFFFF;
+        border-radius: 8px;
+        border: none;
+        font-weight: 600;
+        transition: all 0.2s ease-in-out;
+    }
+    
+    [data-testid="baseButton-primary"]:hover {
+        background-color: #2563EB;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    }
+</style>
+""", unsafe_allow_html=True)
 
 API_KEY = st.secrets["GEMINI_API_KEY"] 
 client = genai.Client(api_key=API_KEY)
