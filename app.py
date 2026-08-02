@@ -155,7 +155,7 @@ with st.form("vitals_form", border=True):
     
     with col1:
         age = st.number_input("Age (Years)", min_value=10, max_value=100, value=25)
-        bs = st.number_input("Blood Sugar (mmol/L)", min_value=0.0, max_value=30.0, value=7.0, step=0.1)
+        bs = st.number_input("Random Blood Sugar (mmol/L)", min_value=0.0, max_value=30.0, value=7.0, step=0.1)
     with col2:
         systolic = st.number_input("Systolic BP (mmHg)", min_value=50, max_value=200, value=120)
         diastolic = st.number_input("Diastolic BP (mmHg)", min_value=30, max_value=150, value=80)
