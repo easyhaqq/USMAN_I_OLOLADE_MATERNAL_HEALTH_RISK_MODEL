@@ -98,15 +98,11 @@ Patient: {display_name}
 Vitals: BP {systolic}/{diastolic} mmHg, Blood glucose {bs_mgdl} mg/dL, Temp {temp}°F, Heart rate {heart_rate} BPM
 Triage risk level (already determined upstream — report it, do not recalculate, soften, or contradict it): {risk_level.upper()}
 
-Write the message in exactly this structure:
-
-**Your Results:**
+Write a well explained, empathetic, and actionable consultation note for {display_name}. Include the following sections:
 [2-3 sentences addressing {display_name} by name. Reference her specific numbers in plain language. Explain what her risk level means for her, practically. {guidance['urgency']} Do not name a specific diagnosis (e.g. preeclampsia, gestational diabetes) — a single reading can't establish one.]
 
 **Recommended Next Steps:**
-* [First actionable recommendation, {guidance['next_step_tone']} in tone]
-* [Second actionable with full guidance and recommendation]
-* [Third brief, actionable recommendation]
+Explain what she should do next, in plain language. Include a clear recommendation for follow-up with her healthcare provider. Emphasize that she should not ignore these readings, and that {guidance['next_step_tone']} care is important.
 
 **Please Note:**
 *As an AI health assistant, I'm not a substitute for medical care. {guidance['closing']}*
