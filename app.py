@@ -15,27 +15,31 @@ st.set_page_config(
 # --- Custom CSS Injection ---
 st.markdown("""
 <style>
-    /* Soften the main background color */
+    /* Add Background Image with a Semi-Transparent Medical Overlay */
     .stApp {
-        background-color: #F8FAFC; 
+        background: linear-gradient(rgba(248, 250, 252, 0.85), rgba(248, 250, 252, 0.90)), 
+                    url("https://images.unsplash.com/photo-1579684385127-1ef15d508118?q=80&w=2000&auto=format&fit=crop");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
     }
     
     /* Make headers a professional dark slate */
     h1, h2, h3 {
-        color: #0F172A;
+        color: #0F172A !important;
     }
     
     /* Style the Form and Data Containers as floating white cards */
     [data-testid="stForm"], div[data-testid="stVerticalBlockBorderWrapper"] > div {
-        background-color: #FFFFFF;
+        background-color: rgba(255, 255, 255, 0.95) !important;
         border-radius: 12px;
         border: 1px solid #E2E8F0;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.1), 0 4px 8px -4px rgba(0, 0, 0, 0.05);
     }
     
     /* Style the st.metric items (Patient Vitals) to look like hospital monitors */
     [data-testid="stMetric"] {
-        background-color: #F1F5F9;
+        background-color: #F1F5F9 !important;
         border-radius: 8px;
         padding: 15px;
         border-left: 5px solid #3B82F6;
@@ -44,8 +48,8 @@ st.markdown("""
     
     /* Add a smooth hover effect to the Primary Button */
     [data-testid="baseButton-primary"] {
-        background-color: #3B82F6;
-        color: #FFFFFF;
+        background-color: #3B82F6 !important;
+        color: #FFFFFF !important;
         border-radius: 8px;
         border: none;
         font-weight: 600;
@@ -53,9 +57,9 @@ st.markdown("""
     }
     
     [data-testid="baseButton-primary"]:hover {
-        background-color: #2563EB;
+        background-color: #2563EB !important;
         transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
     }
 </style>
 """, unsafe_allow_html=True)
