@@ -134,7 +134,7 @@ if menu == "Patient Assessment":
                 for idx, (cls, prob) in enumerate(probabilities.items()):
                     prob_cols[idx].metric(label=f"{cls.title()}", value=f"{prob * 100:.1f}%")
 
-            # 3. Gemini AI Generation Layer (Balanced Length & Token Optimized)
+            # 3. Gemini AI Generation Layer (Foolproof Structure)
             st.subheader(f"Digital Health Assistant Note ({selected_language})")
             
             red_flags = []
@@ -144,27 +144,30 @@ if menu == "Patient Assessment":
             if fetal_movement_drop: red_flags.append("Decreased fetal movement")
 
             prompt = f"""
-You are an empathetic maternal health AI assistant in Nigeria.
-Provide a comforting, structured consultation directly to the patient ({patient_name}).
-
-Patient Vitals:
-- Age: {age}
-- BP: {systolic_bp}/{diastolic_bp} mmHg
-- Glucose: {bs} mmol/L
-- Temp: {body_temp_c} °C
-- HR: {heart_rate} bpm
-- Symptoms: {', '.join(red_flags) if red_flags else 'None'}
-
+Write a maternal health consultation for a patient named {patient_name}.
 Risk Level: {prediction.upper()}
+Vitals: Age {age}, BP {systolic_bp}/{diastolic_bp}, Glucose {bs}, Temp {body_temp_c}, HR {heart_rate}.
+Symptoms: {', '.join(red_flags) if red_flags else 'None'}.
 
-You MUST structure your response into exactly these 5 sections. Do not skip any section, but keep your explanations direct and easy to read:
-1. Warm Greeting & Summary: Gently explain what the {prediction.upper()} risk level means for her.
-2. Vitals Breakdown: Use short bullet points to explain her BP, blood sugar, temp, and heart rate.
-3. Symptoms to Monitor: Address any reported symptoms or general red flags to watch out for.
-4. Next Steps: Provide 1-2 clear, actionable recommendations (e.g., routine clinic visit).
-5. Medical Disclaimer: State clearly that this is an AI tool and not a doctor's final diagnosis.
+Instructions:
+- Write the entire response in {selected_language}.
+- Do NOT output any internal instructions or meta-text. 
+- Use the exact markdown structure below and fill in the paragraphs with a supportive, clear tone:
 
-Language Requirement: Write the ENTIRE response in {selected_language}. Aim for a balanced length (around 250-350 words) to provide enough detail for the patient without being overly verbose.
+### 1. Warm Greeting & Summary
+(Write a comforting 2-sentence greeting explaining the {prediction.upper()} risk level)
+
+### 2. Vitals Breakdown
+(Write a short bulleted list explaining their vitals simply)
+
+### 3. Symptoms to Monitor
+(Write 1-2 sentences about what symptoms they should watch out for)
+
+### 4. Next Steps
+(Write a clear recommendation on what they should do next)
+
+### 5. Medical Disclaimer
+(State clearly that you are an AI and they must see a human doctor)
 """
             if gemini_configured:
                 with st.spinner("Analyzing..."):
@@ -172,15 +175,15 @@ Language Requirement: Write the ENTIRE response in {selected_language}. Aim for 
                         # Instantiate the Gemini model
                         gemini_model = genai.GenerativeModel(
                             model_name="gemini-3.5-flash",
-                            system_instruction="You are a maternal health AI. You must complete all requested sections using clear formatting and bullet points, maintaining a supportive tone."
+                            system_instruction="You are a medical AI assistant. Output ONLY the patient-facing text. Never repeat instructions."
                         )
                         
-                        # Request the generation as a stream with a balanced token cap
+                        # Request the generation as a stream
                         response = gemini_model.generate_content(
                             prompt,
                             stream=True,
                             generation_config=genai.types.GenerationConfig(
-                                temperature=0.3,
+                                temperature=0.2,
                                 max_output_tokens=1000, 
                             )
                         )
