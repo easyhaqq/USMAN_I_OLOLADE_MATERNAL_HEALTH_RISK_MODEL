@@ -184,7 +184,7 @@ Instructions:
                             stream=True,
                             generation_config=genai.types.GenerationConfig(
                                 temperature=0.2,
-                                max_output_tokens=1000, 
+                                max_output_tokens=4000, 
                             )
                         )
                         
