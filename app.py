@@ -134,7 +134,7 @@ if menu == "Patient Assessment":
                 for idx, (cls, prob) in enumerate(probabilities.items()):
                     prob_cols[idx].metric(label=f"{cls.title()}", value=f"{prob * 100:.1f}%")
 
-            # 3. Gemini AI Generation Layer (Token-Optimized & Streaming)
+            # 3. Gemini AI Generation Layer (Balanced Length & Token Optimized)
             st.subheader(f"Digital Health Assistant Note ({selected_language})")
             
             red_flags = []
@@ -145,7 +145,7 @@ if menu == "Patient Assessment":
 
             prompt = f"""
 You are an empathetic maternal health AI assistant in Nigeria.
-Provide a VERY CONCISE, comforting consultation directly to the patient ({patient_name}).
+Provide a comforting, structured consultation directly to the patient ({patient_name}).
 
 Patient Vitals:
 - Age: {age}
@@ -157,14 +157,14 @@ Patient Vitals:
 
 Risk Level: {prediction.upper()}
 
-Structure into 5 short sections. KEEP IT EXTREMELY BRIEF (Under 200 words total):
-1. Summary: 1-2 sentences on what {prediction.upper()} risk means.
-2. Vitals: Brief bullet points only. Do not over-explain.
-3. Symptoms: 1 short sentence to monitor.
-4. Action: 1 clear next step (e.g., clinic visit).
-5. Disclaimer: 1 short sentence stating this is AI, not a doctor's diagnosis.
+You MUST structure your response into exactly these 5 sections. Do not skip any section, but keep your explanations direct and easy to read:
+1. Warm Greeting & Summary: Gently explain what the {prediction.upper()} risk level means for her.
+2. Vitals Breakdown: Use short bullet points to explain her BP, blood sugar, temp, and heart rate.
+3. Symptoms to Monitor: Address any reported symptoms or general red flags to watch out for.
+4. Next Steps: Provide 1-2 clear, actionable recommendations (e.g., routine clinic visit).
+5. Medical Disclaimer: State clearly that this is an AI tool and not a doctor's final diagnosis.
 
-Language Requirement: Write the ENTIRE response in {selected_language}. Be brief to conserve processing.
+Language Requirement: Write the ENTIRE response in {selected_language}. Aim for a balanced length (around 250-350 words) to provide enough detail for the patient without being overly verbose.
 """
             if gemini_configured:
                 with st.spinner("Analyzing..."):
@@ -172,16 +172,16 @@ Language Requirement: Write the ENTIRE response in {selected_language}. Be brief
                         # Instantiate the Gemini model
                         gemini_model = genai.GenerativeModel(
                             model_name="gemini-3.5-flash",
-                            system_instruction="You are a maternal health AI. You must be extremely concise, using brief bullet points to save tokens while remaining polite."
+                            system_instruction="You are a maternal health AI. You must complete all requested sections using clear formatting and bullet points, maintaining a supportive tone."
                         )
                         
-                        # Request the generation as a stream with a strict but safe token limit
+                        # Request the generation as a stream with a balanced token cap
                         response = gemini_model.generate_content(
                             prompt,
                             stream=True,
                             generation_config=genai.types.GenerationConfig(
                                 temperature=0.3,
-                                max_output_tokens=800,
+                                max_output_tokens=1000, 
                             )
                         )
                         
