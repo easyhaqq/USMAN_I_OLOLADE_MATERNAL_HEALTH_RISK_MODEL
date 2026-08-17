@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import joblib
-from openai import OpenAI
+import google.generativeai as genai
 
 # ---------------------------------------------------------
 # Page Configuration
@@ -25,15 +25,12 @@ def load_ml_model():
 
 model = load_ml_model()
 
-def get_grok_client():
-    # Retrieve key from Streamlit secrets
-    api_key = st.secrets.get("XAI_API_KEY", None)
-    if not api_key:
-        return None
-    return OpenAI(
-        api_key=api_key,
-        base_url="https://api.x.ai/v1",
-    )
+# Configure Gemini API
+gemini_api_key = st.secrets.get("GEMINI_API_KEY", None)
+gemini_configured = False
+if gemini_api_key:
+    genai.configure(api_key=gemini_api_key)
+    gemini_configured = True
 
 # ---------------------------------------------------------
 # Sidebar: Navigation & Settings
@@ -137,56 +134,73 @@ if menu == "Patient Assessment":
                 for idx, (cls, prob) in enumerate(probabilities.items()):
                     prob_cols[idx].metric(label=f"{cls.title()}", value=f"{prob * 100:.1f}%")
 
-            # 3. Grok AI Generation Layer
+            # 3. Gemini AI Generation Layer (Now Streaming)
             st.subheader(f"Digital Health Assistant Note ({selected_language})")
             
             red_flags = []
-            if has_headache: red_flags.append("Severe headache/blurred vision")
-            if has_bleeding: red_flags.append("Vaginal bleeding")
-            if has_swelling: red_flags.append("Sudden swelling")
+            if has_headache: red_flags.append("Severe persistent headache or vision changes")
+            if has_bleeding: red_flags.append("Vaginal bleeding or spotting")
+            if has_swelling: red_flags.append("Sudden swelling in face, hands, or feet")
             if fetal_movement_drop: red_flags.append("Decreased fetal movement")
 
             prompt = f"""
 You are an empathetic, professional maternal health AI assistant operating in Nigeria.
-Explain the following triage assessment directly to the patient ({patient_name}).
+Provide a clear, complete, and comforting consultation explanation directly to the patient ({patient_name}).
 
 Patient Vitals:
 - Age: {age}
 - Blood Pressure: {systolic_bp}/{diastolic_bp} mmHg
 - Blood Glucose: {bs} mmol/L
-- Temperature: {body_temp_c} °C
+- Body Temperature: {body_temp_c} °C
 - Heart Rate: {heart_rate} bpm
 - Additional Reported Symptoms: {', '.join(red_flags) if red_flags else 'None reported'}
 
 Machine Learning Risk Output: {prediction.upper()}
 
-Instructions:
-1. Speak in a respectful, warm, reassuring, and clear tone.
-2. Communicate in {selected_language}.
-3. Explain what the vitals and risk level mean in simple language without medical jargon.
-4. Highlight any vital signs or reported symptoms that need close attention.
-5. Emphasize clearly that you are an AI assistant and that this is not a final medical diagnosis.
-6. Provide concrete, actionable next steps (e.g., visit the nearest primary healthcare centre or antenatal clinic).
+Structure your response into clear sections:
+1. Warm Greeting & Overall Summary (Explain what the {prediction.upper()} risk level means).
+2. Vital Signs Breakdown (Explain their BP, blood sugar, temp, and heart rate in simple words).
+3. Important Symptoms / Observations to Monitor.
+4. Next Steps & Recommended Actions (e.g., attending antenatal care or visiting the nearest primary healthcare centre).
+5. Medical Disclaimer (Explicitly state that this is an AI tool and not a doctor's final diagnosis).
+
+Language Requirement: Write the ENTIRE response in {selected_language}.
+CRITICAL INSTRUCTION: Do NOT write a short summary. You MUST provide a LONG, DETAILED explanation covering all 5 sections thoroughly. Translate the full medical context accurately and comprehensively into {selected_language}.
 """
-            client = get_grok_client()
-            if client:
-                with st.spinner("Generating AI explanation via Grok..."):
+            if gemini_configured:
+                with st.spinner("Analyzing..."):
                     try:
-                        response = client.chat.completions.create(
-                            model="grok-2-mini",
-                            messages=[
-                                {"role": "system", "content": "You are a specialized maternal health AI assistant."},
-                                {"role": "user", "content": prompt}
-                            ],
-                            temperature=0.3,
-                            max_tokens=600
+                        # Instantiate the Gemini model with stricter system instructions
+                        gemini_model = genai.GenerativeModel(
+                            model_name="gemini-3.5-flash",
+                            system_instruction="You are an expert maternal healthcare assistant. You must provide very detailed, comprehensive explanations without cutting corners."
                         )
-                        st.info(response.choices[0].message.content)
+                        
+                        # Request the generation as a stream
+                        response = gemini_model.generate_content(
+                            prompt,
+                            stream=True,
+                            generation_config=genai.types.GenerationConfig(
+                                temperature=0.3,
+                                max_output_tokens=2000,
+                            )
+                        )
+                        
+                        # Create a generator to safely stream the text chunks to the UI
+                        def stream_text():
+                            for chunk in response:
+                                if chunk.text:
+                                    yield chunk.text
+
+                        # Render the streaming text cleanly in a container
+                        with st.container(border=True):
+                            st.write_stream(stream_text)
+                            
                     except Exception as e:
-                        st.warning(f"Could not connect to Grok API: {e}")
+                        st.warning(f"Could not connect to Gemini API: {e}")
             else:
                 st.info(
-                    "*(Grok API key not configured in `.streamlit/secrets.toml`. ML inference completed successfully above.)*"
+                    "*(GEMINI_API_KEY not configured in `.streamlit/secrets.toml`. ML inference completed successfully above.)*"
                 )
 
 # ---------------------------------------------------------
@@ -206,7 +220,7 @@ elif menu == "Project Mission & Technical Architecture":
        * Evaluates 6 vital signs: Age, Systolic/Diastolic BP, Blood Sugar (`mmol/L`), Body Temperature, and Heart Rate.
        * Generates probabilistic triage classification (*Low*, *Mid*, or *High Risk*).
     
-    2. **Generative AI Layer (xAI Grok API):**
+    2. **Generative AI Layer (Google Gemini API):**
        * Ingests both tabular predictions and qualitative symptom markers.
        * Synthesizes clinical metrics into culturally accessible, empathetic feedback in English, Pidgin, Yoruba, Hausa, or Igbo.
     
