@@ -134,55 +134,54 @@ if menu == "Patient Assessment":
                 for idx, (cls, prob) in enumerate(probabilities.items()):
                     prob_cols[idx].metric(label=f"{cls.title()}", value=f"{prob * 100:.1f}%")
 
-            # 3. Gemini AI Generation Layer (Now Streaming)
+            # 3. Gemini AI Generation Layer (Token-Optimized & Streaming)
             st.subheader(f"Digital Health Assistant Note ({selected_language})")
             
             red_flags = []
-            if has_headache: red_flags.append("Severe persistent headache or vision changes")
+            if has_headache: red_flags.append("Severe headache or vision changes")
             if has_bleeding: red_flags.append("Vaginal bleeding or spotting")
-            if has_swelling: red_flags.append("Sudden swelling in face, hands, or feet")
+            if has_swelling: red_flags.append("Sudden swelling")
             if fetal_movement_drop: red_flags.append("Decreased fetal movement")
 
             prompt = f"""
-You are an empathetic, professional maternal health AI assistant operating in Nigeria.
-Provide a clear, complete, and comforting consultation explanation directly to the patient ({patient_name}).
+You are an empathetic maternal health AI assistant in Nigeria.
+Provide a VERY CONCISE, comforting consultation directly to the patient ({patient_name}).
 
 Patient Vitals:
 - Age: {age}
-- Blood Pressure: {systolic_bp}/{diastolic_bp} mmHg
-- Blood Glucose: {bs} mmol/L
-- Body Temperature: {body_temp_c} °C
-- Heart Rate: {heart_rate} bpm
-- Additional Reported Symptoms: {', '.join(red_flags) if red_flags else 'None reported'}
+- BP: {systolic_bp}/{diastolic_bp} mmHg
+- Glucose: {bs} mmol/L
+- Temp: {body_temp_c} °C
+- HR: {heart_rate} bpm
+- Symptoms: {', '.join(red_flags) if red_flags else 'None'}
 
-Machine Learning Risk Output: {prediction.upper()}
+Risk Level: {prediction.upper()}
 
-Structure your response into clear sections:
-1. Warm Greeting & Overall Summary (Explain what the {prediction.upper()} risk level means).
-2. Vital Signs Breakdown (Explain their BP, blood sugar, temp, and heart rate in simple words).
-3. Important Symptoms / Observations to Monitor.
-4. Next Steps & Recommended Actions (e.g., attending antenatal care or visiting the nearest primary healthcare centre).
-5. Medical Disclaimer (Explicitly state that this is an AI tool and not a doctor's final diagnosis).
+Structure into 5 short sections. KEEP IT EXTREMELY BRIEF (Under 200 words total):
+1. Summary: 1-2 sentences on what {prediction.upper()} risk means.
+2. Vitals: Brief bullet points only. Do not over-explain.
+3. Symptoms: 1 short sentence to monitor.
+4. Action: 1 clear next step (e.g., clinic visit).
+5. Disclaimer: 1 short sentence stating this is AI, not a doctor's diagnosis.
 
-Language Requirement: Write the ENTIRE response in {selected_language}.
-CRITICAL INSTRUCTION: Do NOT write a short summary. You MUST provide a LONG, DETAILED explanation covering all 5 sections thoroughly. Translate the full medical context accurately and comprehensively into {selected_language}.
+Language Requirement: Write the ENTIRE response in {selected_language}. Be brief to conserve processing.
 """
             if gemini_configured:
                 with st.spinner("Analyzing..."):
                     try:
-                        # Instantiate the Gemini model with stricter system instructions
+                        # Instantiate the Gemini model
                         gemini_model = genai.GenerativeModel(
                             model_name="gemini-3.5-flash",
-                            system_instruction="You are an expert maternal healthcare assistant. You must provide very detailed, comprehensive explanations without cutting corners."
+                            system_instruction="You are a maternal health AI. You must be extremely concise, using brief bullet points to save tokens while remaining polite."
                         )
                         
-                        # Request the generation as a stream
+                        # Request the generation as a stream with a strict but safe token limit
                         response = gemini_model.generate_content(
                             prompt,
                             stream=True,
                             generation_config=genai.types.GenerationConfig(
                                 temperature=0.3,
-                                max_output_tokens=2000,
+                                max_output_tokens=800,
                             )
                         )
                         
