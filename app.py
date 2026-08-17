@@ -1,224 +1,215 @@
 import streamlit as st
-import joblib
 import pandas as pd
-import xgboost as xgb
-import os
-from google import genai
+import joblib
+from openai import OpenAI
 
+# ---------------------------------------------------------
+# Page Configuration
+# ---------------------------------------------------------
 st.set_page_config(
-    page_title="Maternal Triage System | MedAI", 
-    page_icon="🏥", 
+    page_title="MaternalCare AI | Nigeria",
+    page_icon="🩺",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
-# --- Custom CSS Injection ---
-st.markdown("""
-<style>
-    /* Add Background Image with a Semi-Transparent Medical Overlay */
-    .stApp {
-        background: linear-gradient(rgba(248, 250, 252, 0.85), rgba(248, 250, 252, 0.90)), 
-                    url("https://images.unsplash.com/photo-1579684385127-1ef15d508118?q=80&w=2000&auto=format&fit=crop");
-        background-size: cover;
-        background-position: center;
-        background-attachment: fixed;
-    }
-    
-    /* Make headers a professional dark slate */
-    h1, h2, h3 {
-        color: #0F172A !important;
-    }
-    
-    /* Style the Form and Data Containers as floating white cards */
-    [data-testid="stForm"], div[data-testid="stVerticalBlockBorderWrapper"] > div {
-        background-color: rgba(255, 255, 255, 0.95) !important;
-        border-radius: 12px;
-        border: 1px solid #E2E8F0;
-        box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.1), 0 4px 8px -4px rgba(0, 0, 0, 0.05);
-    }
-    
-    /* Style the st.metric items (Patient Vitals) to look like hospital monitors */
-    [data-testid="stMetric"] {
-        background-color: #F1F5F9 !important;
-        border-radius: 8px;
-        padding: 15px;
-        border-left: 5px solid #3B82F6;
-        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-    }
-    
-    /* Add a smooth hover effect to the Primary Button */
-    [data-testid="baseButton-primary"] {
-        background-color: #3B82F6 !important;
-        color: #FFFFFF !important;
-        border-radius: 8px;
-        border: none;
-        font-weight: 600;
-        transition: all 0.2s ease-in-out;
-    }
-    
-    [data-testid="baseButton-primary"]:hover {
-        background-color: #2563EB !important;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
-    }
-</style>
-""", unsafe_allow_html=True)
-
-API_KEY = st.secrets["GEMINI_API_KEY"] 
-client = genai.Client(api_key=API_KEY)
-
-# --- 2. Dynamic Prompt Engine ---
-RISK_GUIDANCE = {
-    "low": {
-        "urgency": "Reassure her that these readings fall within a healthy range and no urgent action is needed.",
-        "next_step_tone": "routine, preventive",
-        "closing": "Please share these readings with your provider at your next scheduled visit.",
-    },
-    "mid": {
-        "urgency": "Let her know some readings need closer monitoring, and follow-up isn't optional even though this isn't an emergency.",
-        "next_step_tone": "monitoring and timely follow-up",
-        "closing": "Please contact your provider within the next few days to review these readings.",
-    },
-    "high": {
-        "urgency": "Be direct that these readings require prompt medical attention. Do not soften this to avoid alarming her.",
-        "next_step_tone": "urgent",
-        "closing": "Please contact your provider today, or go to the nearest emergency care if you feel unwell before then.",
-    },
-}
-
-def _get_risk_guidance(risk_level: str) -> dict:
-    key = risk_level.strip().lower()
-    for tier in ("high", "mid", "low"):  # check most urgent tier first
-        if tier in key:
-            return RISK_GUIDANCE[tier]
-    return RISK_GUIDANCE["mid"]  # unrecognized label: fail toward caution, not complacency
-
-def build_consultation_prompt(display_name, systolic, diastolic, bs_mgdl, temp, heart_rate, risk_level):
-    guidance = _get_risk_guidance(risk_level)
-
-    prompt = f"""You are an AI maternal-health assistant. Write in the voice of an experienced, warm OB/GYN talking to a patient: plain language, no jargon, calm and direct. You are an AI, not a licensed physician, and must never imply otherwise.
-
-Patient: {display_name}
-Vitals: BP {systolic}/{diastolic} mmHg, Blood glucose {bs_mgdl} mg/dL, Temp {temp}°F, Heart rate {heart_rate} BPM
-Triage risk level (already determined upstream — report it, do not recalculate, soften, or contradict it): {risk_level.upper()}
-
-Write a well explained, empathetic, and actionable consultation note for {display_name}. Include the following sections:
-[addressing {display_name} by name. Reference her specific numbers in plain language. Explain what her risk level means for her, practically. {guidance['urgency']} Do not name a specific diagnosis (e.g. preeclampsia, gestational diabetes) — a single reading can't establish one.]
-
-**Recommendation:**
-Explain what she should do next, in plain language. Include a clear recommendation for follow-up with her healthcare provider. Emphasize that she should not ignore these readings, and that {guidance['next_step_tone']} care is important.
-
-**Please Note:**
-*As an AI health assistant, I'm not a substitute for medical care. {guidance['closing']}*
-
-Rules:
-- Base everything only on the vitals and risk level above — don't invent symptoms, history, or reference ranges.
-- Never adopt a name, title, or years-of-experience for yourself.
-- Calm delivery is not the same as minimizing — for mid/high risk, clarity about urgency comes first."""
-    return prompt
-
-# --- 3. Load ML Assets (Cached for Performance) ---
+# ---------------------------------------------------------
+# Helpers & Model Loader
+# ---------------------------------------------------------
 @st.cache_resource
-def load_models():
-    scaler = joblib.load('scaler.pkl')
-    le = joblib.load('label_encoder.pkl')
-    
-    if os.path.exists('maternal_health_model.json'):
-        ml_model = xgb.XGBClassifier()
-        ml_model.load_model('maternal_health_model.json')
-    else:
-        ml_model = joblib.load('maternal_health_model.pkl')
-    return scaler, le, ml_model
+def load_ml_model():
+    try:
+        return joblib.load("maternal_model.pkl")
+    except Exception:
+        return None
 
-scaler, le, ml_model = load_models()
+model = load_ml_model()
 
-# --- 4. UI Layout: Header & Clinical Disclaimer ---
-st.title("🏥 Usman Maternal Health Clinical Triage")
-st.markdown("---")
+def get_grok_client():
+    # Retrieve key from Streamlit secrets
+    api_key = st.secrets.get("XAI_API_KEY", None)
+    if not api_key:
+        return None
+    return OpenAI(
+        api_key=api_key,
+        base_url="https://api.x.ai/v1",
+    )
 
-with st.expander("⚠️ Clinical AI Disclaimer (Please Read)"):
-    st.write("""
-        *This system is an experimental digital health tool powered by machine learning and generative AI. 
-        It is designed to assist in triaging physiological vitals but does **not** replace professional medical advice, diagnosis, or treatment. 
-        Always consult with a qualified healthcare provider for medical decisions.*
-    """)
+# ---------------------------------------------------------
+# Sidebar: Navigation & Settings
+# ---------------------------------------------------------
+st.sidebar.title("🩺 MaternalCare AI")
+st.sidebar.caption("Intelligent Maternal Health Risk Assessment")
 
-# --- 5. Input Form: Patient Vitals ---
-st.markdown("### Patient Intake Form")
-with st.form("vitals_form", border=True):
-    
-    patient_name = st.text_input("Patient Full Name", placeholder="e.g., Jane Doe")
-    
-    st.markdown("#### Physiological Vitals")
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        age = st.number_input("Age (Years)", min_value=10, max_value=100, value=25)
-        # Updated to mg/dL with appropriate limits and default value
-        bs_mgdl = st.number_input("Random Blood Sugar (mg/dL)", min_value=0, max_value=500, value=126, step=1)
-    with col2:
-        systolic = st.number_input("Systolic BP (mmHg)", min_value=50, max_value=200, value=120)
-        diastolic = st.number_input("Diastolic BP (mmHg)", min_value=30, max_value=150, value=80)
-    with col3:
-        temp = st.number_input("Body Temp (°F)", min_value=90.0, max_value=110.0, value=98.6, step=0.1)
-        heart_rate = st.number_input("Heart Rate (BPM)", min_value=40, max_value=150, value=75)
-    
-    submitted = st.form_submit_button("Run Clinical Analysis", type="primary", use_container_width=True)
+menu = st.sidebar.radio(
+    "Navigation",
+    ["Patient Assessment", "Project Mission & Technical Architecture"]
+)
 
-# --- 6. Processing & Output Pipeline ---
-if submitted:
-    display_name = patient_name.strip() if patient_name.strip() else "our patient"
-    
-    # CONVERSION: Convert mg/dL back to mmol/L for the ML Model
-    bs_mmol = round(bs_mgdl / 18.0, 1) 
-    
-    # Pass the converted bs_mmol to the ML model
-    input_df = pd.DataFrame([[age, systolic, diastolic, bs_mmol, temp, heart_rate]], 
-                            columns=['Age', 'SystolicBP', 'DiastolicBP', 'BS', 'BodyTemp', 'HeartRate'])
-    
-    input_scaled = scaler.transform(input_df)
-    pred_encoded = ml_model.predict(input_scaled)
-    risk_level = le.inverse_transform(pred_encoded)[0].lower()
-    
-    st.markdown("---")
-    st.markdown("### 📊 Triage Results & Consultation")
-    
-    metric_cols = st.columns(5)
-    metric_cols[0].metric("Blood Pressure", f"{systolic}/{diastolic}")
-    metric_cols[1].metric("Blood Sugar", f"{bs_mgdl} mg/dL")  # Display the local mg/dL metric
-    metric_cols[2].metric("Body Temp", f"{temp} °F")
-    metric_cols[3].metric("Heart Rate", f"{heart_rate} BPM")
-    metric_cols[4].metric("Age", f"{age} Yrs")
-    
-    if "high" in risk_level:
-        st.error(f"**Automated Triage Assessment: {risk_level.upper()}**")
-    elif "mid" in risk_level:
-        st.warning(f"**Automated Triage Assessment: {risk_level.title()}**")
-    else:
-        st.success(f"**Automated Triage Assessment: {risk_level.title()}**")
-    
-    with st.spinner("Consulting Clinical AI..."):
-        
-        # Call your dynamic prompt builder function
-        prompt = build_consultation_prompt(
-            display_name=display_name,
-            systolic=systolic,
-            diastolic=diastolic,
-            bs_mgdl=bs_mgdl,  # AI gets the mg/dL value
-            temp=temp,
-            heart_rate=heart_rate,
-            risk_level=risk_level
-        )
-        
-        try:
-            response = client.models.generate_content(
-                model='gemini-3.5-flash',
-                contents=prompt
-            )
+st.sidebar.markdown("---")
+st.sidebar.subheader("Localization")
+selected_language = st.sidebar.selectbox(
+    "Preferred Language for AI Assistant",
+    ["English", "Nigerian Pidgin", "Yoruba", "Hausa", "Igbo"]
+)
+
+# ---------------------------------------------------------
+# Tab 1: Patient Assessment Form
+# ---------------------------------------------------------
+if menu == "Patient Assessment":
+    st.title("Maternal Health Risk Triage")
+    st.write(
+        "Enter the patient's basic vitals below to generate a real-time risk classification and clinical explanation."
+    )
+
+    with st.form("patient_form"):
+        st.subheader("1. Patient Profile")
+        col1, col2 = st.columns(2)
+        with col1:
+            patient_name = st.text_input("Patient Full Name / ID", placeholder="e.g. Amina Bello")
+        with col2:
+            age = st.number_input("Age (Years)", min_value=12, max_value=60, value=25)
+
+        st.subheader("2. Physiological Vitals (Nigerian Standards)")
+        col3, col4, col5 = st.columns(3)
+        with col3:
+            systolic_bp = st.number_input("Systolic BP (mmHg)", min_value=60, max_value=220, value=120)
+            diastolic_bp = st.number_input("Diastolic BP (mmHg)", min_value=40, max_value=140, value=80)
+        with col4:
+            bs = st.number_input("Blood Sugar (BS) [mmol/L]", min_value=3.0, max_value=30.0, value=7.0, step=0.1)
+            heart_rate = st.number_input("Heart Rate (bpm)", min_value=40, max_value=160, value=75)
+        with col5:
+            body_temp_c = st.number_input("Body Temperature (°C)", min_value=35.0, max_value=42.0, value=37.0, step=0.1)
+
+        st.subheader("3. Clinical Red-Flag Symptoms (Doctor Checklist)")
+        symptoms_col1, symptoms_col2 = st.columns(2)
+        with symptoms_col1:
+            has_headache = st.checkbox("Severe persistent headache or vision changes")
+            has_bleeding = st.checkbox("Any vaginal bleeding or spotting")
+        with symptoms_col2:
+            has_swelling = st.checkbox("Sudden swelling in face, hands, or feet")
+            fetal_movement_drop = st.checkbox("Noticed decrease in baby's movement")
+
+        submitted = st.form_submit_state = st.form_submit_button("Run Risk Assessment", use_container_width=True)
+
+    if submitted:
+        if not patient_name.strip():
+            st.error("Please enter the patient's name or identifier.")
+        elif model is None:
+            st.error("ML Model artifact (`maternal_model.pkl`) not found. Please train and place the model in the root directory.")
+        else:
+            # 1. Unit Conversion: Celsius -> Fahrenheit for dataset alignment
+            body_temp_f = (body_temp_c * 9/5) + 32
+
+            # 2. Machine Learning Inference
+            input_df = pd.DataFrame([{
+                'Age': age,
+                'SystolicBP': systolic_bp,
+                'DiastolicBP': diastolic_bp,
+                'BS': bs,
+                'BodyTemp': body_temp_f,
+                'HeartRate': heart_rate
+            }])
+
+            prediction = model.predict(input_df)[0]
             
-            with st.container(border=True):
-                st.markdown("#### 🩺 Physician's Notes")
-                st.write(response.text)
-                
-        except Exception as e:
-            st.error(f"Clinical AI Connection Error: {e}")
+            # Prediction Probabilities if supported
+            probabilities = None
+            if hasattr(model, "predict_proba"):
+                probs = model.predict_proba(input_df)[0]
+                classes = model.classes_
+                probabilities = dict(zip(classes, probs))
+
+            st.markdown("---")
+            st.subheader("Assessment Results")
+
+            # Visual Risk Badge
+            if prediction.lower() == "high risk":
+                st.error(f"### Predicted Risk Level: HIGH RISK")
+            elif prediction.lower() == "mid risk":
+                st.warning(f"### Predicted Risk Level: MID RISK")
+            else:
+                st.success(f"### Predicted Risk Level: LOW RISK")
+
+            if probabilities:
+                st.write("**Confidence Breakdown:**")
+                prob_cols = st.columns(len(probabilities))
+                for idx, (cls, prob) in enumerate(probabilities.items()):
+                    prob_cols[idx].metric(label=f"{cls.title()}", value=f"{prob * 100:.1f}%")
+
+            # 3. Grok AI Generation Layer
+            st.subheader(f"Digital Health Assistant Note ({selected_language})")
+            
+            red_flags = []
+            if has_headache: red_flags.append("Severe headache/blurred vision")
+            if has_bleeding: red_flags.append("Vaginal bleeding")
+            if has_swelling: red_flags.append("Sudden swelling")
+            if fetal_movement_drop: red_flags.append("Decreased fetal movement")
+
+            prompt = f"""
+You are an empathetic, professional maternal health AI assistant operating in Nigeria.
+Explain the following triage assessment directly to the patient ({patient_name}).
+
+Patient Vitals:
+- Age: {age}
+- Blood Pressure: {systolic_bp}/{diastolic_bp} mmHg
+- Blood Glucose: {bs} mmol/L
+- Temperature: {body_temp_c} °C
+- Heart Rate: {heart_rate} bpm
+- Additional Reported Symptoms: {', '.join(red_flags) if red_flags else 'None reported'}
+
+Machine Learning Risk Output: {prediction.upper()}
+
+Instructions:
+1. Speak in a respectful, warm, reassuring, and clear tone.
+2. Communicate in {selected_language}.
+3. Explain what the vitals and risk level mean in simple language without medical jargon.
+4. Highlight any vital signs or reported symptoms that need close attention.
+5. Emphasize clearly that you are an AI assistant and that this is not a final medical diagnosis.
+6. Provide concrete, actionable next steps (e.g., visit the nearest primary healthcare centre or antenatal clinic).
+"""
+            client = get_grok_client()
+            if client:
+                with st.spinner("Generating AI explanation via Grok..."):
+                    try:
+                        response = client.chat.completions.create(
+                            model="grok-2-mini",
+                            messages=[
+                                {"role": "system", "content": "You are a specialized maternal health AI assistant."},
+                                {"role": "user", "content": prompt}
+                            ],
+                            temperature=0.3,
+                            max_tokens=600
+                        )
+                        st.info(response.choices[0].message.content)
+                    except Exception as e:
+                        st.warning(f"Could not connect to Grok API: {e}")
+            else:
+                st.info(
+                    "*(Grok API key not configured in `.streamlit/secrets.toml`. ML inference completed successfully above.)*"
+                )
+
+# ---------------------------------------------------------
+# Tab 2: Project Mission & Technical Documentation
+# ---------------------------------------------------------
+elif menu == "Project Mission & Technical Architecture":
+    st.title("Project Overview: Combating Maternal Mortality in Nigeria")
+    
+    st.markdown("""
+    ### The Challenge
+    Nigeria accounts for a significant portion of global maternal deaths. Delays in identifying complications—such as gestational hypertension, preeclampsia, and gestational diabetes—often occur due to limited access to specialized triage in rural and underserved primary health centres.
+
+    ### System Architecture
+    This application integrates predictive machine learning with conversational Generative AI:
+    
+    1. **Predictive Core (Scikit-Learn Ensemble):** 
+       * Evaluates 6 vital signs: Age, Systolic/Diastolic BP, Blood Sugar (`mmol/L`), Body Temperature, and Heart Rate.
+       * Generates probabilistic triage classification (*Low*, *Mid*, or *High Risk*).
+    
+    2. **Generative AI Layer (xAI Grok API):**
+       * Ingests both tabular predictions and qualitative symptom markers.
+       * Synthesizes clinical metrics into culturally accessible, empathetic feedback in English, Pidgin, Yoruba, Hausa, or Igbo.
+    
+    3. **Data Protection & Privacy:**
+       * Operates on a stateless session model—patient identifiable information is not stored in a persistent database.
+    """)

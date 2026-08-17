@@ -1,7 +1,1 @@
-# Environments
-.env
-__pycache__/
-
-# Mac/Windows system files
-.DS_Store
-Thumbs.db
+.streamlit/
